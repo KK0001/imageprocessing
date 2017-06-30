@@ -1,7 +1,5 @@
-#! python3
-# -*- coding:utf-8 -*-
-
 # http://kivantium.hateblo.jp/entry/2015/11/18/233834
+# 使用する関数
 
 def inference(images_placeholder, keep_prob):
     """ 予測モデルを作成する関数
@@ -13,20 +11,25 @@ def inference(images_placeholder, keep_prob):
     返り値:
       y_conv: 各クラスの確率(のようなもの)
     """
+    # 重み
     # 重みを標準偏差0.1の正規分布で初期化
     def weight_variable(shape):
       initial = tf.truncated_normal(shape, stddev=0.1)
       return tf.Variable(initial)
 
+    # バイアス
     # バイアスを標準偏差0.1の正規分布で初期化
     def bias_variable(shape):
       initial = tf.constant(0.1, shape=shape)
       return tf.Variable(initial)
 
+    # 畳み込み層モデル
     # 畳み込み層の作成
     def conv2d(x, W):
       return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
+    # プーリング層モデル
+    # プーリングとは、大きな画像を、重要な情報は残しつつ縮小する方法で、画像内を小さなウィンドウに区切り、区切ったそれぞれのウィンドウから最大値を取るというもの
     # プーリング層の作成
     def max_pool_2x2(x):
       return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
@@ -75,3 +78,55 @@ def inference(images_placeholder, keep_prob):
 
     # 各ラベルの確率のようなものを返す
     return y_conv
+
+
+def loss(logits, labels):
+    """ lossを計算する関数
+
+    引数:
+      logits: ロジットのtensor, float - [batch_size, NUM_CLASSES]
+      labels: ラベルのtensor, int32 - [batch_size, NUM_CLASSES]
+
+    返り値:
+      cross_entropy: 交差エントロピーのtensor, float
+
+    """
+
+    # 交差エントロピーの計算
+    cross_entropy = -tf.reduce_sum(labels*tf.log(logits))
+    # TensorBoardで表示するよう指定
+    tf.scalar_summary("cross_entropy", cross_entropy)
+    return cross_entropy
+
+
+def training(loss, learning_rate):
+    """ 訓練のopを定義する関数
+
+    引数:
+      loss: 損失のtensor, loss()の結果
+      learning_rate: 学習係数
+
+    返り値:
+      train_step: 訓練のop
+
+    """
+
+    train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    return train_step
+
+
+def accuracy(logits, labels):
+    """ 正解率(accuracy)を計算する関数
+
+    引数:
+      logits: inference()の結果
+      labels: ラベルのtensor, int32 - [batch_size, NUM_CLASSES]
+
+    返り値:
+      accuracy: 正解率(float)
+
+    """
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+    tf.scalar_summary("accuracy", accuracy)
+    return accuracy

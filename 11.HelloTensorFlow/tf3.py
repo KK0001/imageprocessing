@@ -1,14 +1,34 @@
-#! python3
-# -*- coding:utf-8 -*-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import sys
+import cv2
+import numpy as np
+import tensorflow as tf
+import tensorflow.python.platform
 
-# http://kivantium.hateblo.jp/entry/2015/11/18/233834
+NUM_CLASSES = 2
+IMAGE_SIZE = 28
+IMAGE_PIXELS = IMAGE_SIZE*IMAGE_SIZE*3
+
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+flags.DEFINE_string('train', 'train.txt', 'File name of train data')
+flags.DEFINE_string('test', 'test.txt', 'File name of train data')
+flags.DEFINE_string('train_dir', '/tmp/data', 'Directory to put the training data.')
+flags.DEFINE_integer('max_steps', 200, 'Number of steps to run trainer.')
+flags.DEFINE_integer('batch_size', 10, 'Batch size'
+                     'Must divide evenly into the dataset sizes.')
+flags.DEFINE_float('learning_rate', 1e-4, 'Initial learning rate.')
+
+
+# 以下、CNN
 
 def inference(images_placeholder, keep_prob):
     """ 予測モデルを作成する関数
 
     引数:
       images_placeholder: 画像のplaceholder
-      keep_prob: dropout率のplaceholder
+      keep_prob: dropout率のplace_holder
 
     返り値:
       y_conv: 各クラスの確率(のようなもの)
@@ -75,3 +95,52 @@ def inference(images_placeholder, keep_prob):
 
     # 各ラベルの確率のようなものを返す
     return y_conv
+
+def loss(logits, labels):
+    """ lossを計算する関数
+
+    引数:
+      logits: ロジットのtensor, float - [batch_size, NUM_CLASSES]
+      labels: ラベルのtensor, int32 - [batch_size, NUM_CLASSES]
+
+    返り値:
+      cross_entropy: 交差エントロピーのtensor, float
+
+    """
+
+    # 交差エントロピーの計算
+    cross_entropy = -tf.reduce_sum(labels*tf.log(logits))
+    # TensorBoardで表示するよう指定
+    tf.scalar_summary("cross_entropy", cross_entropy)
+    return cross_entropy
+
+def training(loss, learning_rate):
+    """ 訓練のOpを定義する関数
+
+    引数:
+      loss: 損失のtensor, loss()の結果
+      learning_rate: 学習係数
+
+    返り値:
+      train_step: 訓練のOp
+
+    """
+
+    train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+    return train_step
+
+def accuracy(logits, labels):
+    """ 正解率(accuracy)を計算する関数
+
+    引数:
+      logits: inference()の結果
+      labels: ラベルのtensor, int32 - [batch_size, NUM_CLASSES]
+
+    返り値:
+      accuracy: 正解率(float)
+
+    """
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+    tf.scalar_summary("accuracy", accuracy)
+    return accuracy
